@@ -6,29 +6,34 @@
 
     <groupId>com.antwerkz.jreleaser</groupId>
     <artifactId>testrepo</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.2-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>local-snapshot</id>
+            <url>file://${local.repository.path}/</url>
+        </snapshotRepository>
+        <repository>
+            <id>local-release</id>
+            <url>file://${local.repository.path}/</url>
+        </repository>
+    </distributionManagement>
 
     <properties>
-        <maven.compiler.source>19</maven.compiler.source>
-        <maven.compiler.target>19</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <app.main.class>com.antwerkz.jreleaser.Main</app.main.class>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <java.version>19</java.version>
+        <java.version>17</java.version>
         <app.distribution.directory>${project.build.directory}/distributions/app</app.distribution.directory>
         <jreleaser-maven-plugin.version>1.11.0-SNAPSHOT</jreleaser-maven-plugin.version>
+        <local.repository.path>${maven.multiModuleProjectDirectory}/target/localRepo</local.repository.path>
     </properties>
 
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.1.1</version>
-                <configuration>
-                    <mainClass>${app.main.class}</mainClass>
-                </configuration>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -38,72 +43,69 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.3.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <inherited>false</inherited>
                 <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>${app.main.class}</mainClass>
-                        </manifest>
-                    </archive>
+                    <filesets>
+                        <fileset>
+                            <directory>${local.repository.path}</directory>
+                        </fileset>
+                    </filesets>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <id>generate-repository-directories</id>
+                        <phase>generate-sources</phase>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${local.repository.path}/"/>
+                            </target>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
         </plugins>
     </build>
 
     <profiles>
         <profile>
-            <id>jreleaser</id>
+            <id>main</id>
             <activation>
-                <activeByDefault>true</activeByDefault>
-<!--
                 <property>
                     <name>jreleaser</name>
+                    <value>!true</value>
                 </property>
--->
             </activation>
-            <distributionManagement>
-                <snapshotRepository>
-                    <id>local-snapshot</id>
-                    <url>file://${local.repository.path}/</url>
-                </snapshotRepository>
-                <repository>
-                    <id>local-release</id>
-                    <url>file://${local.repository.path}/</url>
-                </repository>
-            </distributionManagement>
+
+            <modules>
+                <module>module1</module>
+                <module>module2</module>
+                <module>module3</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>jreleaser</id>
+            <activation>
+                <property>
+                    <name>jreleaser</name>
+                    <value>true</value>
+                </property>
+            </activation>
             <build>
                 <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-clean-plugin</artifactId>
-                        <inherited>false</inherited>
-                        <configuration>
-                            <filesets>
-                                <fileset>
-                                    <directory>${local.repository.path}</directory>
-                                </fileset>
-                            </filesets>
-                        </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-antrun-plugin</artifactId>
-                        <version>3.1.0</version>
-                        <inherited>false</inherited>
-                        <executions>
-                            <execution>
-                                <id>generate-repository-directories</id>
-                                <phase>generate-sources</phase>
-                                <configuration>
-                                    <target>
-                                        <mkdir dir="${local.repository.path}/"/>
-                                    </target>
-                                </configuration>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-enforcer-plugin</artifactId>
@@ -193,6 +195,7 @@
                         <groupId>org.jreleaser</groupId>
                         <artifactId>jreleaser-maven-plugin</artifactId>
                         <version>${jreleaser-maven-plugin.version}</version>
+                        <inherited>false</inherited>
                         <configuration>
                             <jreleaser>
                                 <project>
@@ -204,26 +207,11 @@
                                         <label>${jreleaser.tag.name}-SNAPSHOT</label>
                                     </snapshot>
                                 </project>
-                                <announce>
-                                    <active>${jreleaser.announce}</active>
-                                    <bluesky>
-                                        <active>${jreleaser.announce.bluesky}</active>
-                                        <host>https://bsky.social/</host>
-                                        <handle>${env.BLUESKY_USERNAME}</handle>
-                                        <password>${env.BLUESKY_PASSWORD}</password>
-                                        <status>{{projectName}} {{projectVersion}} has been released! {{releaseNotesUrl}}</status>
-                                    </bluesky>
-                                    <mastodon>
-                                        <active>${jreleaser.announce.mastodon}</active>
-                                        <host>https://mastodon.social</host>
-                                        <accessToken>${env.MASTODON_ACCESS_KEY}</accessToken>
-                                        <status>{{projectName}} {{projectVersion}} has been released! {{releaseNotesUrl}}</status>
-                                    </mastodon>
-                                </announce>
                                 <signing>
                                     <active>ALWAYS</active>
                                     <armored>true</armored>
                                 </signing>
+<!--
                                 <deploy>
                                     <maven>
                                         <pomchecker>
@@ -243,11 +231,12 @@
                                         </nexus2>
                                     </maven>
                                 </deploy>
+-->
                                 <release>
                                     <github>
                                         <releaseName>Release {{projectVersionNumber}}</releaseName>
                                         <skipTag>true</skipTag>
-                                        <skipRelease>${snapshot.build}</skipRelease>
+                                        <skipRelease>false</skipRelease>
                                         <milestone>
                                             <name>{{projectVersionNumber}}</name>
                                         </milestone>
@@ -315,9 +304,6 @@
                 <release.author>Justin Lee (@evanchooly)</release.author>
                 <release.email>jlee@antwerkz.com</release.email>
 
-                <local.repository.path>${maven.multiModuleProjectDirectory}/target/localRepo</local.repository.path>
-                <snapshot.build>true</snapshot.build>
-                <skipTests>true</skipTests>
 
                 <jreleaser.announce>NEVER</jreleaser.announce>
                 <jreleaser.announce.bluesky>NEVER</jreleaser.announce.bluesky>
@@ -328,5 +314,4 @@
             </properties>
         </profile>
     </profiles>
-
 </project>
